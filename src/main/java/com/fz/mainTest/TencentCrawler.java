@@ -41,8 +41,6 @@ public class TencentCrawler {
 
     private static ChromeDriver driver = null;
 
-    private static final float speed = 1.2f;
-
     static {
         System.setProperty("webdriver.chrome.driver", "./libs/chromedriver.exe");
 //        System.setProperty("webdriver.chrome.driver", "C:/Users/Administrator/AppData/Local/Google/Chrome/Application/chromedriver.exe");
