@@ -1,5 +1,10 @@
 package com.fz.mainTest;
 
+import cn.hutool.json.JSONArray;
+import cn.hutool.json.JSONObject;
+import com.fz.Entity.MoveEntity;
+import com.fz.Entity.Person;
+import com.fz.Utils.PropertyUtil;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.client.CookieStore;
 import org.apache.http.client.methods.HttpGet;
@@ -26,6 +31,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.KeyStore;
+import java.sql.Time;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -39,119 +47,201 @@ public class TencentCrawler {
     //小方块距离左边界距离，对应到原图的距离
     private static final int START_DISTANCE = (22 + 16) * 2;
 
-    private static ChromeDriver driver = null;
+//    private static ChromeDriver driver = null;
 
     static {
         System.setProperty("webdriver.chrome.driver", "./libs/chromedriver.exe");
-//        System.setProperty("webdriver.chrome.driver", "C:/Users/Administrator/AppData/Local/Google/Chrome/Application/chromedriver.exe");
     }
 
     public static void main(String[] args) {
-        crawl();
+        TencentCrawler tencentCrawler = new TencentCrawler();
+        //指定日期调用
+        String time = PropertyUtil.getProperties("readyTime");
+        Timer timer = new Timer();
+        try {
+            timer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    tencentCrawler.getPersonAndStart();
+                }
+            }, new SimpleDateFormat("yyyy-MM-dd hh:mm:ss").parse(time));
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
     }
 
+    /**
+     * 脚本入口
+     */
+    public void getPersonAndStart() {
+        Person person = null;
+        JSONArray person_array = PropertyUtil.TraversePropertiesInfo();
+        for (Object obj : person_array) {
+            person = new Person();
+            person.setName(new JSONObject(obj).get("person.name").toString());
+            person.setIdCard(new JSONObject(obj).get("person.idCard").toString());
+            person.setPhone(new JSONObject(obj).get("person.phone").toString());
+            person.setType(new JSONObject(obj).get("person.type").toString());
+            System.out.println("person:" + person);
+            Person finalPerson = person;
+            new Thread(() -> {
+                new TencentCrawler().crawl(finalPerson);
+            }, person.getName()).start();
+        }
+    }
 
-    public static void crawl() {
+    /**
+     * 脚本入口
+     *
+     * @param person 人员信息
+     */
+    public void crawl(Person person) {
+        TencentCrawler tencentCrawler = new TencentCrawler();
         long startTime = System.currentTimeMillis();   //获取开始时间
+        String type = person.getType();
         ChromeOptions chromeOptions = new ChromeOptions();
         // 设置禁止加载项
-        Map<String, Object> prefs = new HashMap<String, Object>();
+        Map<String, Object> prefs = new HashMap<>();
         // 禁止加载js
         prefs.put("profile.default_content_settings.javascript", 2); // 2就是代表禁止加载的意思
         // 禁止加载css
         prefs.put("profile.default_content_settings.images", 2); // 2就是代表禁止加载的意思
         chromeOptions.setExperimentalOption("prefs", prefs);
         //chromeOptions.addArguments("disable-infobars");
-        driver = new ChromeDriver(chromeOptions);
-        for (int i = 0; i < 1; i++) {
-            try {
-                driver.manage().window().setSize(new Dimension(1024, 768));
-                driver.manage().timeouts().implicitlyWait(4, TimeUnit.SECONDS);
-                driver.manage().timeouts().pageLoadTimeout(4, TimeUnit.SECONDS);
-                long startTime5 = System.currentTimeMillis();   //获取开始时间
-//                driver.get("https://www.sf-express.com/cn/sc/dynamic_function/waybill/#search/bill-number/294579639081");
-                driver.get("http://health-exp.ayyy.cn/ayhpv//hpv/info");
-                driver.findElement(By.id("customerName")).sendKeys("方清");
-                driver.findElement(By.id("idCard")).sendKeys("340923199908128128");
-                driver.findElement(By.id("mobile")).sendKeys("13358049091");
+        ChromeDriver driver = new ChromeDriver(chromeOptions);
+        driver.manage().window().setSize(new Dimension(1024, 768));
+        driver.get("http://health-exp.ayyy.cn/ayhpv//hpv/info");
 
-                //写JS方法让界面显示单选框
-                String inputShow = "$('#selectType9,#selectType4,#selectType2').show()";
-                JavascriptExecutor jsShow = driver;
-                jsShow.executeScript(inputShow);
-
-                //勾选九价
-                String input9JChecked = "$(\"input:radio[id='type9']\").attr('checked','true')";
-                JavascriptExecutor js9JChecked = driver;
-                js9JChecked.executeScript(input9JChecked);
-
-                //点击下一步按钮
-                driver.findElement(By.id("TencentCaptcha")).sendKeys(Keys.SPACE);
-
-                Thread.sleep(1000);
-                Actions actions = new Actions(driver);
-                driver.switchTo().frame("tcaptcha_iframe");
-                String originalUrl = Jsoup.parse(driver.getPageSource()).select("[id=slideBg]").first().attr("src");
-//                String originalUrl = "https://captcha.guard.qcloud.com" + Jsoup.parse(driver.getPageSource()).select("[id=slideBg]").first().attr("src");
-                long endTime5 = System.currentTimeMillis(); //获取结束时间
-                System.out.println("加载网页以及图片程序运行时间： " + (endTime5 - startTime5) + "ms");
-                long startTime3 = System.currentTimeMillis();   //获取开始时间
-                downloadOriginalImg(i, originalUrl, driver.manage().getCookies());
-                long endTime3 = System.currentTimeMillis(); //获取结束时间
-                System.out.println("下载图片程序运行时间： " + (endTime3 - startTime3) + "ms");
-                float bgWrapWidth = driver.findElement(By.className("tc-drag-track")).getSize().getWidth();
-                System.out.println("bgWrapWidth:" + bgWrapWidth);
-                long startTime1 = System.currentTimeMillis();   //获取开始时间
-                int distance = calcMoveDistance(i, bgWrapWidth);
-                System.out.println("distance:" + distance);
-                long endTime1 = System.currentTimeMillis(); //获取结束时间
-                System.out.println("计算小方块需要移动的距离程序运行时间： " + (endTime1 - startTime1) + "ms");
-                long startTime2 = System.currentTimeMillis(); //获取开始时间
-                List<MoveEntity> list = getMoveEntity1(distance);
-                long endTime2 = System.currentTimeMillis(); //获取结束时间
-                System.out.println("计算移动算法程序运行时间： " + (endTime2 - startTime2) + "ms");
-                WebElement element = driver.findElement(By.id("tcaptcha_drag_button"));
-                actions.clickAndHold(element).perform();
-                int d = 0;
-                long startTime4 = System.currentTimeMillis(); //获取开始时间
-                for (MoveEntity moveEntity : list) {
-                    actions.moveByOffset(moveEntity.getX(), moveEntity.getY()).perform();
-                    System.out.println("向右总共移动了:" + (d = d + moveEntity.getX()));
-                    Thread.sleep(moveEntity.getSleepTime());
+        String time = PropertyUtil.getProperties("writeTime");
+        Timer timer = new Timer(person.getName());
+        try {
+            timer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    tencentCrawler.scriptEntry(driver, type, startTime);
                 }
-                long endTime4 = System.currentTimeMillis(); //获取结束时间
-                System.out.println("执行移动程序运行时间： " + (endTime4 - startTime4) + "ms");
-                actions.release(element).perform();
-                Thread.sleep(2000);
-
-                //点击确认
-                WebElement sureBtn = driver.findElement(By.className("layui-layer-btn0"));
-                sureBtn.click();
-                //判断是否成功
-                Thread.sleep(2000);
-                String title = driver.getTitle();
-                System.out.println("标题:" + title);
-                if ("预约失败".equals(title)){
-                    //发送失败邮件
-                }else {
-                    //发送成功邮件
-                }
-
-                List<WebElement> elements = driver.findElements(By.className("route-list"));
-                for (WebElement webElement : elements) {
-                    System.out.println(webElement.getText());
-                }
-
-                long endTime = System.currentTimeMillis(); //获取结束时间
-                System.out.println("程序总运行时间： " + (endTime - startTime) + "ms");
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            }, new SimpleDateFormat("yyyy-MM-dd hh:mm:ss").parse(time));
+        } catch (ParseException e) {
+            e.printStackTrace();
         }
+
+    }
+
+    /**
+     * 脚本入口代码
+     *
+     * @param driver
+     * @param type
+     * @param startTime
+     */
+    public void scriptEntry(ChromeDriver driver, String type, long startTime) {
+        long currentTimeMillis = System.currentTimeMillis();
+        try {
+//            driver.navigate().refresh();  //刷新页面
+            driver.manage().timeouts().implicitlyWait(2, TimeUnit.SECONDS);
+            driver.manage().timeouts().pageLoadTimeout(1, TimeUnit.SECONDS);
+            long startTime5 = System.currentTimeMillis();   //获取开始时间
+            driver.findElement(By.id("customerName")).sendKeys("方清");
+            driver.findElement(By.id("idCard")).sendKeys("340923199908128128");
+            driver.findElement(By.id("mobile")).sendKeys("13358049091");
+//                driver.findElement(By.id("customerName")).sendKeys(person.getName());
+//                driver.findElement(By.id("idCard")).sendKeys(person.getIdCard());
+//                driver.findElement(By.id("mobile")).sendKeys(person.getPhone());
+
+            //写JS方法让界面显示单选框
+            String inputShow = "$('#selectType9,#selectType4,#selectType2').show()";
+            ((JavascriptExecutor) driver).executeScript(inputShow);
+
+            //勾选九价
+            String input9JChecked = "$(\"input:radio[id='type" + type + "']\").attr('checked','true')";
+            ((JavascriptExecutor) driver).executeScript(input9JChecked);
+
+            //点击下一步按钮
+            driver.findElement(By.id("TencentCaptcha")).sendKeys(Keys.SPACE);
+
+            Thread.sleep(1000);
+            Actions actions = new Actions(driver);
+            driver.switchTo().frame("tcaptcha_iframe");
+            String originalUrl = Jsoup.parse(driver.getPageSource()).select("[id=slideBg]").first().attr("src");
+            long endTime5 = System.currentTimeMillis(); //获取结束时间
+            System.out.println("加载网页以及图片程序运行时间： " + (endTime5 - startTime5) + "ms");
+            long startTime3 = System.currentTimeMillis();   //获取开始时间
+            downloadOriginalImg(0, originalUrl, driver.manage().getCookies(), currentTimeMillis);
+            long endTime3 = System.currentTimeMillis(); //获取结束时间
+            System.out.println("下载图片程序运行时间： " + (endTime3 - startTime3) + "ms");
+            float bgWrapWidth = driver.findElement(By.className("tc-drag-track")).getSize().getWidth();
+            System.out.println("bgWrapWidth:" + bgWrapWidth);
+            long startTime1 = System.currentTimeMillis();   //获取开始时间
+            int distance = calcMoveDistance(0, bgWrapWidth, currentTimeMillis);
+            System.out.println("distance:" + distance);
+            long endTime1 = System.currentTimeMillis(); //获取结束时间
+            System.out.println("计算小方块需要移动的距离程序运行时间： " + (endTime1 - startTime1) + "ms");
+            long startTime2 = System.currentTimeMillis(); //获取开始时间
+            List<MoveEntity> list = getMoveEntity1(distance);
+            long endTime2 = System.currentTimeMillis(); //获取结束时间
+            System.out.println("计算移动算法程序运行时间： " + (endTime2 - startTime2) + "ms");
+            WebElement element = driver.findElement(By.id("tcaptcha_drag_button"));
+            actions.clickAndHold(element).perform();
+            int d = 0;
+            long startTime4 = System.currentTimeMillis(); //获取开始时间
+            for (MoveEntity moveEntity : list) {
+                actions.moveByOffset(moveEntity.getX(), moveEntity.getY()).perform();
+                System.out.println(Thread.currentThread().getName() + "向右总共移动了:" + (d = d + moveEntity.getX()) + "高度:" + moveEntity.getY());
+                Thread.sleep(moveEntity.getSleepTime());
+            }
+            long endTime4 = System.currentTimeMillis(); //获取结束时间
+            System.out.println("执行移动程序运行时间： " + (endTime4 - startTime4) + "ms");
+            actions.release(element).perform();
+            Thread.sleep(2000);
+
+            String clickTime = PropertyUtil.getProperties("clickTime");
+            Timer timer = new Timer();
+            timer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    clickSure(driver,startTime);
+                }
+            }, new SimpleDateFormat("yyyy-MM-dd hh:mm:ss").parse(clickTime));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    /**
+     * 最后的确认按键
+     *
+     * @param driver 页面
+     */
+    public void clickSure(ChromeDriver driver,Long startTime) {
+        //点击确认
+        WebElement sureBtn = driver.findElement(By.className("layui-layer-btn0"));
+        sureBtn.click();
+        //判断是否成功
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        String title = driver.getTitle();
+        System.out.println("标题:" + title);
+        if ("预约失败".equals(title)) {
+            //发送失败邮件
+        } else {
+            //发送成功邮件
+        }
+        List<WebElement> elements = driver.findElements(By.className("route-list"));
+        for (WebElement webElement : elements) {
+            System.out.println(webElement.getText());
+        }
+
+        long endTime = System.currentTimeMillis(); //获取结束时间
+        System.out.println("程序总运行时间： " + (endTime - startTime) + "ms");
         driver.quit();
     }
 
-    private static void downloadOriginalImg(int i, String originalUrl, Set<Cookie> cookieSet) throws IOException {
+
+    private void downloadOriginalImg(int i, String originalUrl, Set<Cookie> cookieSet, Long currentTimeMillis) throws IOException {
         CookieStore cookieStore = new BasicCookieStore();
         cookieSet.forEach(c -> {
             BasicClientCookie cookie = new BasicClientCookie(c.getName(), c.getValue());
@@ -178,7 +268,7 @@ public class TencentCrawler {
                     .build()
                     .execute(new HttpGet(originalUrl))
                     .getEntity().getContent();
-            FileUtils.copyInputStreamToFile(is, new File(BASE_PATH + "tencent-original" + i + ".png"));
+            FileUtils.copyInputStreamToFile(is, new File(BASE_PATH + "tencent-original" + i + "-" + currentTimeMillis + ".png"));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -192,8 +282,8 @@ public class TencentCrawler {
      * @return
      * @throws IOException
      */
-    public static int calcMoveDistance(int i, float bgWrapWidth) throws IOException {
-        BufferedImage fullBI = ImageIO.read(new File(BASE_PATH + "tencent-original" + i + ".png"));
+    public int calcMoveDistance(int i, float bgWrapWidth, Long currentTimeMillis) throws IOException {
+        BufferedImage fullBI = ImageIO.read(new File(BASE_PATH + "tencent-original" + i + "-" + currentTimeMillis + ".png"));
         for (int w = 340; w < fullBI.getWidth() - 18; w++) {
             int whiteLineLen = 0;
             for (int h = 0; h < fullBI.getHeight(); h++) {
@@ -221,7 +311,7 @@ public class TencentCrawler {
      *
      * @return 后28个中有80%是黑色返回true, 否则返回false
      */
-    private static boolean isBlack28(BufferedImage fullBI, int w, int h) {
+    private boolean isBlack28(BufferedImage fullBI, int w, int h) {
         int[] fullRgb = new int[3];
         double blackNum = 0;
         int num = Math.min(fullBI.getWidth() - w, 28);
@@ -244,7 +334,7 @@ public class TencentCrawler {
      * @param h
      * @return
      */
-    private static boolean isWhite(BufferedImage fullBI, int w, int h) {
+    private boolean isWhite(BufferedImage fullBI, int w, int h) {
         int[] fullRgb = new int[3];
         fullRgb[0] = (fullBI.getRGB(w, h) & 0xff0000) >> 16;
         fullRgb[1] = (fullBI.getRGB(w, h) & 0xff00) >> 8;
@@ -252,11 +342,11 @@ public class TencentCrawler {
         return isWhite(fullRgb);
     }
 
-    private static boolean isWhite(int[] fullRgb) {
+    private boolean isWhite(int[] fullRgb) {
         return (Math.abs(fullRgb[0] - 0xff) + Math.abs(fullRgb[1] - 0xff) + Math.abs(fullRgb[2] - 0xff)) < 125;
     }
 
-    private static boolean isBlack(int[] fullRgb) {
+    private boolean isBlack(int[] fullRgb) {
         return fullRgb[0] * 0.3 + fullRgb[1] * 0.6 + fullRgb[2] * 0.1 <= 125;
     }
 
@@ -266,7 +356,7 @@ public class TencentCrawler {
      * @param distance
      * @return
      */
-    public static List<MoveEntity> getMoveEntity(int distance) {
+    public List<MoveEntity> getMoveEntity(int distance) {
         List<MoveEntity> list = new ArrayList<>();
         for (int i = 0; i < distance; i++) {
 
@@ -285,7 +375,7 @@ public class TencentCrawler {
      * @param distance
      * @return
      */
-    public static List<MoveEntity> getMoveEntity1(int distance) {
+    public List<MoveEntity> getMoveEntity1(int distance) {
         List<MoveEntity> list = new ArrayList<>();
         for (int i = 0; i < distance / 10; i++) {
             MoveEntity moveEntity = new MoveEntity();
@@ -295,11 +385,11 @@ public class TencentCrawler {
             list.add(moveEntity);
         }
 
-        MoveEntity moveEntity = new MoveEntity();
-        moveEntity.setX(distance % 10);
-        moveEntity.setY(0);
-        moveEntity.setSleepTime(1);
-        list.add(moveEntity);
+//        MoveEntity moveEntity = new MoveEntity();
+//        moveEntity.setX(distance % 10);
+//        moveEntity.setY(0);
+//        moveEntity.setSleepTime(1);
+//        list.add(moveEntity);
         return list;
     }
 }

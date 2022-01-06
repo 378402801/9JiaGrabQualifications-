@@ -1,4 +1,4 @@
-package com.fz.mainTest;
+package com.fz.Entity;
 
 
 public class MoveEntity {

@@ -3,6 +3,7 @@ package com.fz.Utils;
 
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
+import com.google.common.base.Strings;
 
 import java.io.*;
 import java.util.Properties;
@@ -37,6 +38,7 @@ public class PropertyUtil {
 
     /**
      * 遍历Properties数据,归纳人员信息
+     *
      * @return 人员信息
      */
     public static JSONArray TraversePropertiesInfo() {
@@ -51,7 +53,7 @@ public class PropertyUtil {
                 obj = new JSONObject();
                 flag = false;
             }
-            obj.set(String.valueOf(key), getProperties(String.valueOf(key)));
+            obj.set(splitNumber(String.valueOf(key)), getProperties(String.valueOf(key)));
             if (String.valueOf(key).contains("type")) {
                 array.add(obj);
                 flag = true;
@@ -62,6 +64,7 @@ public class PropertyUtil {
 
     /**
      * 获取Properties信息
+     *
      * @return Properties信息
      */
     private static Properties getProp() {
@@ -75,5 +78,21 @@ public class PropertyUtil {
             e.printStackTrace();
         }
         return prop;
+    }
+
+    /**
+     * 去除数字
+     *
+     * @return
+     */
+    public static String splitNumber(String key) {
+        StringBuilder keyStr = new StringBuilder();
+        if (!Strings.isNullOrEmpty(key)) {
+            String[] keyArr = key.split("\\d+");
+            for (String s : keyArr) {
+                keyStr.append(s);
+            }
+        }
+        return keyStr.toString();
     }
 }
