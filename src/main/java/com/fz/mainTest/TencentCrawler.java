@@ -20,6 +20,7 @@ import org.apache.http.impl.cookie.BasicClientCookie;
 import org.apache.http.ssl.SSLContexts;
 import org.jsoup.Jsoup;
 import org.openqa.selenium.*;
+import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.interactions.Actions;
@@ -46,6 +47,8 @@ public class TencentCrawler {
     private static final String BASE_PATH = "E:/TencentImg/";
     //小方块距离左边界距离，对应到原图的距离
     private static final int START_DISTANCE = (22 + 16) * 2;
+
+    private boolean flag = true;
 
 //    private static ChromeDriver driver = null;
 
@@ -155,56 +158,87 @@ public class TencentCrawler {
             //勾选九价
             String input9JChecked = "$(\"input:radio[id='type" + type + "']\").attr('checked','true')";
             ((JavascriptExecutor) driver).executeScript(input9JChecked);
-
             //点击下一步按钮
             driver.findElement(By.id("TencentCaptcha")).sendKeys(Keys.SPACE);
-
             Thread.sleep(1000);
             Actions actions = new Actions(driver);
+            //移动滑块
+            WebElement element = null;
+            long result = 0;
             driver.switchTo().frame("tcaptcha_iframe");
-            String originalUrl = Jsoup.parse(driver.getPageSource()).select("[id=slideBg]").first().attr("src");
-            long endTime5 = System.currentTimeMillis(); //获取结束时间
-            System.out.println("加载网页以及图片程序运行时间： " + (endTime5 - startTime5) + "ms");
-            long startTime3 = System.currentTimeMillis();   //获取开始时间
-            downloadOriginalImg(0, originalUrl, driver.manage().getCookies(), currentTimeMillis);
-            long endTime3 = System.currentTimeMillis(); //获取结束时间
-            System.out.println("下载图片程序运行时间： " + (endTime3 - startTime3) + "ms");
-            float bgWrapWidth = driver.findElement(By.className("tc-drag-track")).getSize().getWidth();
-            System.out.println("bgWrapWidth:" + bgWrapWidth);
-            long startTime1 = System.currentTimeMillis();   //获取开始时间
-            int distance = calcMoveDistance(0, bgWrapWidth, currentTimeMillis);
-            System.out.println("distance:" + distance);
-            long endTime1 = System.currentTimeMillis(); //获取结束时间
-            System.out.println("计算小方块需要移动的距离程序运行时间： " + (endTime1 - startTime1) + "ms");
-            long startTime2 = System.currentTimeMillis(); //获取开始时间
-            List<MoveEntity> list = getMoveEntity1(distance);
-            long endTime2 = System.currentTimeMillis(); //获取结束时间
-            System.out.println("计算移动算法程序运行时间： " + (endTime2 - startTime2) + "ms");
-            WebElement element = driver.findElement(By.id("tcaptcha_drag_button"));
-            actions.clickAndHold(element).perform();
-            int d = 0;
-            long startTime4 = System.currentTimeMillis(); //获取开始时间
-            for (MoveEntity moveEntity : list) {
-                actions.moveByOffset(moveEntity.getX(), moveEntity.getY()).perform();
-                System.out.println(Thread.currentThread().getName() + "向右总共移动了:" + (d = d + moveEntity.getX()) + "高度:" + moveEntity.getY());
-                Thread.sleep(moveEntity.getSleepTime());
+            //判断滑块是否成功,未成功则继续滑块
+            while (flag){
+                result += moveTXVerification(driver, startTime5, currentTimeMillis, element, actions);
             }
-            long endTime4 = System.currentTimeMillis(); //获取结束时间
-            System.out.println("执行移动程序运行时间： " + (endTime4 - startTime4) + "ms");
-            actions.release(element).perform();
-            Thread.sleep(2000);
+            System.out.println("执行移动程序运行时间： " + result + "ms");
 
             String clickTime = PropertyUtil.getProperties("clickTime");
             Timer timer = new Timer();
             timer.schedule(new TimerTask() {
                 @Override
                 public void run() {
-                    clickSure(driver,startTime);
+                    clickSure(driver, startTime);
                 }
             }, new SimpleDateFormat("yyyy-MM-dd hh:mm:ss").parse(clickTime));
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * 移动腾讯滑块方法
+     * @param driver 页面
+     * @param startTime5 开始时间
+     * @param currentTimeMillis 当前毫秒值
+     * @param element 标签对象
+     * @param actions 动作时间
+     * @return 整体滑动时间计算
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public long moveTXVerification(ChromeDriver driver, long startTime5, long currentTimeMillis, WebElement element, Actions actions) throws IOException, InterruptedException {
+        String originalUrl = Jsoup.parse(driver.getPageSource()).select("[id=slideBg]").first().attr("src");
+        long endTime5 = System.currentTimeMillis(); //获取结束时间
+        System.out.println("加载网页以及图片程序运行时间： " + (endTime5 - startTime5) + "ms");
+        long startTime3 = System.currentTimeMillis();   //获取开始时间
+        downloadOriginalImg(0, originalUrl, driver.manage().getCookies(), currentTimeMillis);
+        long endTime3 = System.currentTimeMillis(); //获取结束时间
+        System.out.println("下载图片程序运行时间： " + (endTime3 - startTime3) + "ms");
+        float bgWrapWidth = driver.findElement(By.className("tc-drag-track")).getSize().getWidth();
+        System.out.println("bgWrapWidth:" + bgWrapWidth);
+        long startTime1 = System.currentTimeMillis();   //获取开始时间
+        int distance = calcMoveDistance(0, bgWrapWidth, currentTimeMillis);
+        System.out.println("distance:" + distance);
+        long endTime1 = System.currentTimeMillis(); //获取结束时间
+        System.out.println("计算小方块需要移动的距离程序运行时间： " + (endTime1 - startTime1) + "ms");
+        long startTime2 = System.currentTimeMillis(); //获取开始时间
+        List<MoveEntity> list = getMoveEntity1(distance);
+        long endTime2 = System.currentTimeMillis(); //获取结束时间
+        System.out.println("计算移动算法程序运行时间： " + (endTime2 - startTime2) + "ms");
+        element = driver.findElement(By.id("tcaptcha_drag_button"));
+        actions.clickAndHold(element).perform();
+        int d = 0;
+        long startTime4 = System.currentTimeMillis(); //获取开始时间
+        for (MoveEntity moveEntity : list) {
+            actions.moveByOffset(moveEntity.getX(), moveEntity.getY()).perform();
+            System.out.println(Thread.currentThread().getName() + "向右总共移动了:" + (d = d + moveEntity.getX()) + "高度:" + moveEntity.getY());
+            Thread.sleep(moveEntity.getSleepTime());
+        }
+        actions.release(element).perform();
+        Thread.sleep(2000);
+        //判断是否成功
+        try {
+            WebElement element1 = driver.findElement(By.xpath("//a[@class='layui-layer-btn0']"));
+            if (element1.isDisplayed()){
+                flag = false;
+            }else {
+                System.out.println("滑块失败,重新启动滑块!");
+            }
+        } catch (NoSuchElementException e){
+            System.out.println("滑块失败,重新启动滑块!");
+        }
+        long endTime4 = System.currentTimeMillis(); //获取结束时间
+        return endTime4 - startTime4;
     }
 
 
@@ -213,7 +247,7 @@ public class TencentCrawler {
      *
      * @param driver 页面
      */
-    public void clickSure(ChromeDriver driver,Long startTime) {
+    public void clickSure(ChromeDriver driver, Long startTime) {
         //点击确认
         WebElement sureBtn = driver.findElement(By.className("layui-layer-btn0"));
         sureBtn.click();
@@ -385,11 +419,11 @@ public class TencentCrawler {
             list.add(moveEntity);
         }
 
-//        MoveEntity moveEntity = new MoveEntity();
-//        moveEntity.setX(distance % 10);
-//        moveEntity.setY(0);
-//        moveEntity.setSleepTime(1);
-//        list.add(moveEntity);
+        MoveEntity moveEntity = new MoveEntity();
+        moveEntity.setX(distance % 10);
+        moveEntity.setY(0);
+        moveEntity.setSleepTime(1);
+        list.add(moveEntity);
         return list;
     }
 }
