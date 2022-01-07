@@ -167,7 +167,7 @@ public class TencentCrawler {
             long result = 0;
             driver.switchTo().frame("tcaptcha_iframe");
             //判断滑块是否成功,未成功则继续滑块
-            while (flag){
+            while (flag) {
                 result += moveTXVerification(driver, startTime5, currentTimeMillis, element, actions);
             }
             System.out.println("执行移动程序运行时间： " + result + "ms");
@@ -187,11 +187,12 @@ public class TencentCrawler {
 
     /**
      * 移动腾讯滑块方法
-     * @param driver 页面
-     * @param startTime5 开始时间
+     *
+     * @param driver            页面
+     * @param startTime5        开始时间
      * @param currentTimeMillis 当前毫秒值
-     * @param element 标签对象
-     * @param actions 动作时间
+     * @param element           标签对象
+     * @param actions           动作时间
      * @return 整体滑动时间计算
      * @throws IOException
      * @throws InterruptedException
@@ -229,12 +230,12 @@ public class TencentCrawler {
         //判断是否成功
         try {
             WebElement element1 = driver.findElement(By.xpath("//a[@class='layui-layer-btn0']"));
-            if (element1.isDisplayed()){
+            if (element1.isDisplayed()) {
                 flag = false;
-            }else {
+            } else {
                 System.out.println("滑块失败,重新启动滑块!");
             }
-        } catch (NoSuchElementException e){
+        } catch (NoSuchElementException e) {
             System.out.println("滑块失败,重新启动滑块!");
         }
         long endTime4 = System.currentTimeMillis(); //获取结束时间
