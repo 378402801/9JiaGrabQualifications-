@@ -40,6 +40,13 @@
             <version>1.18.20</version>
         </dependency>
 
+        <dependency>
+            <groupId>javax.mail</groupId>
+            <artifactId>mail</artifactId>
+            <version>1.4.1</version>
+            <scope>provided</scope><!--这里你视项目情况而定-->
+        </dependency>
+
 
     </dependencies>
 
